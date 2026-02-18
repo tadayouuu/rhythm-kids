@@ -4,16 +4,16 @@ import "./App.css";
 
 const CARDS = [
   // 音符（rest:false）＝ピッ音、休符（rest:true）＝打楽器（逆仕様）
-  { id: "q", icon: "♩", pattern: [{ len: 1, rest: false }] },                 // 四分
-  { id: "e", icon: "♪", pattern: [{ len: 0.5, rest: false }] },                 // 八分（単体）
+  { id: "q", icon: "♩", pattern: [{ len: 1, rest: false }] }, // 四分
+  { id: "e", icon: "♪", pattern: [{ len: 0.5, rest: false }] }, // 八分（単体）
   { id: "e2", icon: "♫", pattern: [{ len: 0.5, rest: false }, { len: 0.5, rest: false }] }, // 八分×2
-  { id: "s2", icon: "♬", pattern: [0.25, 0.25] }, // ★16分×2
-  { id: "s", icon: "𝅘𝅥𝅯", pattern: [{ len: 0.25, rest: false }] },                // 16分（※出ない端末あり）
-  { id: "h", icon: "𝅗𝅥", pattern: [{ len: 2, rest: false }] },                 // 二分（※出ない端末あり）
-  { id: "w", icon: "𝅝", pattern: [{ len: 4, rest: false }] },                 // 全音符（※出ない端末あり）
+  { id: "s2", icon: "♬", pattern: [{ len: 0.25, rest: false }, { len: 0.25, rest: false }] }, // 16分×2 ★ここ修正
+  { id: "s", icon: "𝅘𝅥𝅯", pattern: [{ len: 0.25, rest: false }] }, // 16分
+  { id: "h", icon: "𝅗𝅥", pattern: [{ len: 2, rest: false }] }, // 二分
+  { id: "w", icon: "𝅝", pattern: [{ len: 4, rest: false }] }, // 全音符
 
-  { id: "rq", icon: "𝄽", pattern: [{ len: 1, rest: true }] },                  // 四分休符
-  { id: "re", icon: "𝄾", pattern: [{ len: 0.5, rest: true }] },                  // 八分休符（※出ない端末あり）
+  { id: "rq", icon: "𝄽", pattern: [{ len: 1, rest: true }] }, // 四分休符
+  { id: "re", icon: "𝄾", pattern: [{ len: 0.5, rest: true }] }, // 八分休符
 ];
 
 export default function App() {
