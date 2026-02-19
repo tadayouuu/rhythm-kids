@@ -1,6 +1,7 @@
-import { useState, useRef } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import * as Tone from "tone";
 import "./App.css";
+
 import {
   QuarterNote,
   EighthNote,
@@ -10,146 +11,248 @@ import {
   HalfNote,
   WholeNote,
   QuarterRest,
-  EighthRest
+  EighthRest,
 } from "./notes";
 
-const CARDS = [
-  { id: "w", icon: <WholeNote />, pattern: [{ len: 4, rest: false }] },
-  { id: "h", icon: <HalfNote />, pattern: [{ len: 2, rest: false }] },
-  { id: "q", icon: <QuarterNote />, pattern: [{ len: 1, rest: false }] },
-  { id: "e", icon: <EighthNote />, pattern: [{ len: 0.5, rest: false }] },
-  { id: "e2", icon: <EighthPair />, pattern: [{ len: 0.5, rest: false }, { len: 0.5, rest: false }] },
-  { id: "s", icon: <SixteenthNote />, pattern: [{ len: 0.25, rest: false }] },
-  { id: "s2", icon: <SixteenthPair />, pattern: [{ len: 0.25, rest: false }, { len: 0.25, rest: false }] },
+// 4/4 を 16分刻みで扱う：1小節=16 ticks
+const BAR_TICKS = 16;
 
-  { id: "rq", icon: <QuarterRest />, pattern: [{ len: 1, rest: true }] },
-  { id: "re", icon: <EighthRest />, pattern: [{ len: 0.5, rest: true }] },
+// len(拍) → ticks 変換（4/4想定）
+const beatsToTicks = (beats) => Math.round(beats * 4); // 1拍=4ticks
+
+// カード定義（patternは「len:拍 / rest」）
+const CARDS = [
+  { id: "w", name: "全音符", icon: <WholeNote />, pattern: [{ len: 4, rest: false }] }, // 16 ticks
+  { id: "h", name: "二分", icon: <HalfNote />, pattern: [{ len: 2, rest: false }] }, // 8
+  { id: "q", name: "四分", icon: <QuarterNote />, pattern: [{ len: 1, rest: false }] }, // 4
+  { id: "e", name: "八分", icon: <EighthNote />, pattern: [{ len: 0.5, rest: false }] }, // 2
+  { id: "e2", name: "八分×2", icon: <EighthPair />, pattern: [{ len: 0.5, rest: false }, { len: 0.5, rest: false }] }, // 4
+  { id: "s", name: "16分", icon: <SixteenthNote />, pattern: [{ len: 0.25, rest: false }] }, // 1
+  { id: "s2", name: "16分×2", icon: <SixteenthPair />, pattern: [{ len: 0.25, rest: false }, { len: 0.25, rest: false }] }, // 2
+  { id: "rq", name: "四分休符", icon: <QuarterRest />, pattern: [{ len: 1, rest: true }] }, // 4
+  { id: "re", name: "八分休符", icon: <EighthRest />, pattern: [{ len: 0.5, rest: true }] }, // 2
 ];
 
-export default function App() {
-  const [slots, setSlots] = useState([null, null, null, null]);
-  const [playingIndex, setPlayingIndex] = useState(null);
+// pattern → 合計ticks
+function patternTicks(card) {
+  return card.pattern.reduce((sum, p) => sum + beatsToTicks(p.len), 0);
+}
 
-  // 2種類の音：打楽器（休符用）と ピッ（音符用）
+export default function App() {
+  // 配置したブロック（時間レーン）
+  // item: { key, cardId, startTick, ticks }
+  const [items, setItems] = useState([]);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playTick, setPlayTick] = useState(0);
+
+  // 音：逆仕様（音符=ピッ、休符=打楽器）
   const drumRef = useRef(null);
   const beepRef = useRef(null);
 
-  const timeoutsRef = useRef([]);
+  const rafRef = useRef(null);
+  const stopTimersRef = useRef([]);
 
-  const addCard = (card) => {
-    setSlots((prev) => {
-      const next = [...prev];
-      const empty = next.findIndex((s) => s === null);
-      if (empty !== -1) next[empty] = card;
-      return next;
-    });
-  };
-
-  const stopAll = () => {
-    timeoutsRef.current.forEach((id) => clearTimeout(id));
-    timeoutsRef.current = [];
-    setPlayingIndex(null);
-  };
-
-  const clearAll = () => {
-    stopAll();
-    setSlots([null, null, null, null]);
-  };
+  const usedTicks = useMemo(
+    () => items.reduce((s, it) => s + it.ticks, 0),
+    [items]
+  );
 
   const ensureAudio = async () => {
-    // タップ操作をトリガーにAudio解禁
     await Tone.start();
-
-    // 休符用：打楽器（ポン）
     if (!drumRef.current) {
       drumRef.current = new Tone.MembraneSynth().toDestination();
     }
-
-    // 音符用：ピッ（短いビープ）
     if (!beepRef.current) {
       beepRef.current = new Tone.Synth({
         oscillator: { type: "sine" },
-        envelope: { attack: 0.001, decay: 0.05, sustain: 0.0, release: 0.05 }
+        envelope: { attack: 0.001, decay: 0.05, sustain: 0.0, release: 0.05 },
       }).toDestination();
     }
   };
 
-  const playSequence = async () => {
+  const stopAll = () => {
+    stopTimersRef.current.forEach((id) => clearTimeout(id));
+    stopTimersRef.current = [];
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = null;
+    setIsPlaying(false);
+    setPlayTick(0);
+  };
+
+  const clearAll = () => {
+    stopAll();
+    setItems([]);
+  };
+
+  // 次に置けるtick（詰め込み方式）
+  const nextTick = usedTicks;
+
+  const addCard = (card) => {
+    const ticks = patternTicks(card);
+    if (nextTick + ticks > BAR_TICKS) return; // 収まらん
+
+    setItems((prev) => [
+      ...prev,
+      {
+        key: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+        cardId: card.id,
+        startTick: nextTick,
+        ticks,
+      },
+    ]);
+  };
+
+  const removeItem = (key) => {
+    // 削除したら左詰めし直す（子ども向けにわかりやすい）
+    setItems((prev) => {
+      const filtered = prev.filter((x) => x.key !== key);
+      let t = 0;
+      return filtered.map((x) => {
+        const nx = { ...x, startTick: t };
+        t += x.ticks;
+        return nx;
+      });
+    });
+  };
+
+  const cardById = useMemo(() => {
+    const m = new Map(CARDS.map((c) => [c.id, c]));
+    return (id) => m.get(id);
+  }, []);
+
+  const play = async () => {
     stopAll();
     await ensureAudio();
 
     const bpm = 70;
-    const beatMs = 60000 / bpm;
-    const startAt = Tone.now() + 0.05;
+    const tickMs = (60000 / bpm) / 4; // 16分=1tick
+    const startAt = Tone.now() + 0.06;
 
-    let beatPos = 0;
+    // 音イベントを全部スケジュール
+    for (const it of items) {
+      const card = cardById(it.cardId);
+      if (!card) continue;
 
-    slots.forEach((card, slotIndex) => {
-      if (!card) return;
+      let localTick = it.startTick;
 
-      // カードごとに光る（カード先頭タイミング）
-      const hiMs = beatPos * beatMs;
-      timeoutsRef.current.push(
-        setTimeout(() => setPlayingIndex(slotIndex), hiMs)
-      );
+      for (const p of card.pattern) {
+        const lenTicks = beatsToTicks(p.len);
+        const t = startAt + (localTick * tickMs) / 1000;
 
-      card.pattern.forEach(({ len, rest }) => {
-        const t = startAt + (beatPos * beatMs) / 1000;
-
-        if (rest) {
-          drumRef.current?.triggerAttackRelease("C2", "8n", t); // 休符＝打楽器
+        if (p.rest) {
+          // 休符＝打楽器
+          drumRef.current?.triggerAttackRelease("C2", "8n", t);
         } else {
-          beepRef.current?.triggerAttackRelease("C6", 0.05, t); // 音符＝ピッ
+          // 音符＝ピッ
+          beepRef.current?.triggerAttackRelease("C6", 0.05, t);
         }
 
-        beatPos += len;
-      });
-    });
+        localTick += lenTicks;
+      }
+    }
 
-    // 終了後に消灯
-    const endMs = beatPos * beatMs;
-    timeoutsRef.current.push(
-      setTimeout(() => setPlayingIndex(null), endMs + 80)
+    // 再生ヘッド（見た目）
+    setIsPlaying(true);
+    const startPerf = performance.now();
+    const totalMs = BAR_TICKS * tickMs;
+
+    const loop = () => {
+      const elapsed = performance.now() - startPerf;
+      const tick = Math.min(BAR_TICKS, Math.floor(elapsed / tickMs));
+      setPlayTick(tick);
+
+      if (elapsed < totalMs) {
+        rafRef.current = requestAnimationFrame(loop);
+      } else {
+        setIsPlaying(false);
+        setPlayTick(0);
+      }
+    };
+    rafRef.current = requestAnimationFrame(loop);
+
+    // 念のため終了処理
+    stopTimersRef.current.push(
+      setTimeout(() => {
+        setIsPlaying(false);
+        setPlayTick(0);
+      }, totalMs + 120)
     );
   };
+
+  // アンマウント時安全
+  useEffect(() => () => stopAll(), []);
 
   return (
     <div className="container">
       <h1>リズムあそび</h1>
 
-      {/* 上の4マス（横並び） */}
-      <div className="slots">
-        {slots.map((slot, i) => (
+      {/* レーン */}
+      <div className="laneWrap">
+        <div className="lane">
+          {/* 背景グリッド（4拍を太線に） */}
+          {Array.from({ length: BAR_TICKS }).map((_, i) => (
+            <div
+              key={i}
+              className={`tick ${i % 4 === 0 ? "beat" : ""}`}
+              style={{ left: `${(i / BAR_TICKS) * 100}%` }}
+            />
+          ))}
+
+          {/* ブロック */}
+          {items.map((it) => {
+            const card = cardById(it.cardId);
+            const left = (it.startTick / BAR_TICKS) * 100;
+            const width = (it.ticks / BAR_TICKS) * 100;
+            return (
+              <button
+                key={it.key}
+                type="button"
+                className="block"
+                style={{ left: `${left}%`, width: `${width}%` }}
+                onClick={() => removeItem(it.key)}
+                title="タップでけす"
+              >
+                {card?.icon}
+              </button>
+            );
+          })}
+
+          {/* 再生ヘッド */}
           <div
-            key={i}
-            className={`slot ${playingIndex === i ? "active" : ""}`}
-          >
-            {slot ? slot.icon : ""}
-          </div>
-        ))}
+            className={`playhead ${isPlaying ? "show" : ""}`}
+            style={{ left: `${(playTick / BAR_TICKS) * 100}%` }}
+          />
+        </div>
+
+        <div className="meter">
+          のこり：{BAR_TICKS - usedTicks} / {BAR_TICKS}
+        </div>
       </div>
 
-      {/* 下：カード選択（音符アイコン） */}
+      {/* カード一覧 */}
       <div className="cards">
-        {CARDS.map((card) => (
-          <button
-            key={card.id}
-            type="button"
-            onClick={() => addCard(card)}
-            className="cardBtn"
-            aria-label={card.read}
-            title={card.read}
-          >
-            {card.icon}
-          </button>
-        ))}
+        {CARDS.map((card) => {
+          const canPlace = nextTick + patternTicks(card) <= BAR_TICKS;
+          return (
+            <button
+              key={card.id}
+              type="button"
+              className={`cardBtn ${canPlace ? "" : "disabled"}`}
+              onClick={() => canPlace && addCard(card)}
+              title={card.name}
+            >
+              {card.icon}
+            </button>
+          );
+        })}
       </div>
 
-      {/* 操作ボタン */}
       <div className="controls">
-        <button type="button" onClick={playSequence}>▶ スタート</button>
+        <button type="button" onClick={play}>▶ スタート</button>
         <button type="button" onClick={clearAll}>⟲ ぜんぶけす</button>
       </div>
+
+      <div className="hint">ブロックをタップすると消えるで</div>
     </div>
   );
 }

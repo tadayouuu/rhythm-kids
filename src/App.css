@@ -3,69 +3,114 @@ body {
   background: #111;
   color: #eee;
   text-align: center;
-
-  /* 𝄽 が出やすいフォント優先（端末によっては豆腐になることもある） */
-  font-family: "Noto Music", "Noto Sans Symbols2", "Segoe UI Symbol", sans-serif;
+  font-family: system-ui, sans-serif;
 }
 
 .container {
-  padding: 20px;
+  padding: 18px;
 }
 
 h1 {
-  margin: 10px 0 20px;
-  font-size: 44px;
-  font-weight: 800;
+  margin: 10px 0 16px;
+  font-size: 40px;
+  font-weight: 900;
 }
 
-/* 上の4マス：横並び */
-.slots {
-  display: flex;
-  justify-content: center;
-  gap: 16px;
-  margin: 16px 0 18px;
-  flex-wrap: nowrap;
+.laneWrap {
+  margin: 10px auto 14px;
+  max-width: 720px;
 }
 
-.slot {
-  width: 86px;
-  height: 86px;
+.lane {
+  position: relative;
+  height: 120px;
   background: #fff;
   border-radius: 18px;
   border: 3px solid #ddd;
+  overflow: hidden;
+}
 
+.tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(0, 0, 0, 0.10);
+  transform: translateX(-1px);
+}
+
+.tick.beat {
+  width: 3px;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.block {
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  border: none;
+  border-radius: 16px;
+  background: #74b9ff;
   display: flex;
   align-items: center;
   justify-content: center;
-
-  /* 白マスに白文字事故を防ぐ */
-  color: #111;
-  font-size: 26px;
-  font-weight: 900;
-  user-select: none;
+  padding: 0;
 }
 
-.slot.active {
+.block:active {
+  transform: scale(0.98);
+}
+
+.playhead {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  width: 4px;
   background: #ffcc70;
-  transform: scale(1.08);
+  transform: translateX(-2px);
+  opacity: 0;
+}
+
+.playhead.show {
+  opacity: 1;
+}
+
+.block svg {
+  width: 54px;
+  height: 86px;
+}
+
+.meter {
+  margin-top: 8px;
+  font-size: 18px;
+  font-weight: 800;
+  opacity: 0.9;
 }
 
 .cards {
-  margin: 18px 0 8px;
+  margin: 14px 0 6px;
 }
 
 .cardBtn {
-  font-size: 52px;
-  margin: 10px 12px;
-  padding: 16px 26px;
+  margin: 10px 10px;
+  padding: 14px 22px;
   border-radius: 22px;
   border: none;
-  background: #74b9ff;
-  color: white;
+  background: #2d3436;
+  color: #fff;
 }
 
-.controls {
-  margin-top: 8px;
+.cardBtn svg {
+  width: 62px;
+  height: 86px;
+}
+
+.cardBtn:active {
+  transform: scale(0.98);
+}
+
+.cardBtn.disabled {
+  opacity: 0.35;
 }
 
 .controls button {
@@ -78,12 +123,8 @@ h1 {
   color: #fff;
 }
 
-.slot svg {
-  width: 50px;
-  height: 70px;
-}
-
-.cardBtn svg {
-  width: 60px;
-  height: 80px;
+.hint {
+  margin-top: 6px;
+  font-size: 16px;
+  opacity: 0.8;
 }
