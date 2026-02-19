@@ -46,8 +46,12 @@ export default function App() {
   const [playTick, setPlayTick] = useState(0);
 
   // 音：逆仕様（音符=ピッ、休符=打楽器）
-  const drumRef = useRef(null);
-  const beepRef = useRef(null);
+  // const drumRef = useRef(null);
+  // const beepRef = useRef(null);
+
+  const drumRestRef = useRef(null);   // 休符用（今までの）
+  const bangNoteRef = useRef(null);   // 音符用（バンッ）
+  const noiseRef = useRef(null);
 
   const rafRef = useRef(null);
   const stopTimersRef = useRef([]);
@@ -57,17 +61,59 @@ export default function App() {
     [items]
   );
 
+  // const ensureAudio = async () => {
+  //   await Tone.start();
+  //   if (!drumRef.current) {
+  //     drumRef.current = new Tone.MembraneSynth().toDestination();
+  //   }
+  //   if (!beepRef.current) {
+  //     beepRef.current = new Tone.Synth({
+  //       oscillator: { type: "sine" },
+  //       envelope: { attack: 0.001, decay: 0.05, sustain: 0.0, release: 0.05 },
+  //     }).toDestination();
+  //   }
+  // };
+
   const ensureAudio = async () => {
     await Tone.start();
-    if (!drumRef.current) {
-      drumRef.current = new Tone.MembraneSynth().toDestination();
-    }
-    if (!beepRef.current) {
-      beepRef.current = new Tone.Synth({
-        oscillator: { type: "sine" },
-        envelope: { attack: 0.001, decay: 0.05, sustain: 0.0, release: 0.05 },
+
+    // 休符用（いまの太鼓：そのまま系）
+    if (!drumRestRef.current) {
+      drumRestRef.current = new Tone.MembraneSynth({
+        pitchDecay: 0.02,
+        octaves: 2,
+        envelope: { attack: 0.001, decay: 0.15, sustain: 0.0, release: 0.01 },
+        volume: -6
       }).toDestination();
     }
+
+    // 音符用（バンッ：太め＆短め）
+    if (!bangNoteRef.current) {
+      bangNoteRef.current = new Tone.MembraneSynth({
+        pitchDecay: 0.008,
+        octaves: 8,
+        oscillator: { type: "sine" },
+        envelope: { attack: 0.001, decay: 0.06, sustain: 0.0, release: 0.01 },
+        volume: 0,                 // ここ上げると“前に出る”
+      });
+
+      // ちょい圧縮して“バンッ”感を安定させる
+      const comp = new Tone.Compressor(-18, 8);
+      bangNoteRef.current.chain(comp, Tone.Destination);
+    }
+
+    // アタック（パッ）を混ぜるノイズ：高域だけ残して“打撃”に寄せる
+    if (!noiseRef.current) {
+      const hp = new Tone.Filter(1800, "highpass");
+      noiseRef.current = new Tone.NoiseSynth({
+        noise: { type: "white" },
+        envelope: { attack: 0.001, decay: 0.02, sustain: 0.0 },
+        volume: -6
+      });
+
+      noiseRef.current.chain(hp, Tone.Destination);
+    }
+
   };
 
   const stopAll = () => {
@@ -141,10 +187,12 @@ export default function App() {
 
         if (p.rest) {
           // 休符＝打楽器
-          drumRef.current?.triggerAttackRelease("C2", "8n", t);
+          // drumRef.current?.triggerAttackRelease("C2", "8n", t);
+          drumRestRef.current?.triggerAttackRelease("C2", "16n", t);
         } else {
-          // 音符＝ピッ
-          beepRef.current?.triggerAttackRelease("C6", 0.05, t);
+          // 音符＝バンッ
+          bangNoteRef.current?.triggerAttackRelease("C1", "32n", t); // ← G1よりC1の方が“ドン/バン”寄り
+          noiseRef.current?.triggerAttackRelease("32n", t);
         }
 
         localTick += lenTicks;
