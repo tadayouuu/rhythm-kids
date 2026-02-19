@@ -87,36 +87,40 @@ export default function App() {
       }).toDestination();
     }
 
-    // 音符用（バンッ：太め＆短め）
+    // 音符用（バァン寄り）
     if (!bangNoteRef.current) {
+      const lp = new Tone.Filter(900, "lowpass");          // ツッ成分を丸める
+      const comp = new Tone.Compressor(-22, 12);           // 太く前に出す
+      const gain = new Tone.Gain(1.35);                    // ちょい持ち上げ
+
       bangNoteRef.current = new Tone.MembraneSynth({
-        pitchDecay: 0.006,      // 少し速く落とす（パンチ強化）
-        octaves: 10,            // 倍音増やして圧を足す
+        pitchDecay: 0.03,          // ←短すぎるとツッになりがち。少し伸ばす
+        octaves: 5,                // 倍音は増やしすぎない（増やすと硬くなる）
         oscillator: { type: "sine" },
         envelope: {
           attack: 0.001,
-          decay: 0.09,          // 少し伸ばす（ドンの余韻）
+          decay: 0.22,             // ←ここが“バァン”の要
           sustain: 0.0,
-          release: 0.02
+          release: 0.08
         },
-        volume: 2               // ← ここ +2dB が効く
+        volume: 0
       });
 
-      const comp = new Tone.Compressor(-20, 10); // 少しだけ強く圧縮
-      bangNoteRef.current.chain(comp, Tone.Destination);
+      bangNoteRef.current.chain(lp, comp, gain, Tone.Destination);
     }
 
-    // アタック（パッ）を混ぜるノイズ：高域だけ残して“打撃”に寄せる
+    // アタックノイズ（ツッを減らして“ドン”の押し出しだけ残す）
     if (!noiseRef.current) {
-      const hp = new Tone.Filter(1500, "highpass"); // ちょい下げて存在感出す
+      const lpN = new Tone.Filter(1600, "lowpass");        // 高域をカットしてツッを抑える
       noiseRef.current = new Tone.NoiseSynth({
         noise: { type: "white" },
-        envelope: { attack: 0.001, decay: 0.025, sustain: 0.0 },
-        volume: -3    // ← -6 → -3 にするだけで“バン”が前に出る
+        envelope: { attack: 0.001, decay: 0.015, sustain: 0.0 },
+        volume: -10                                       // ←前に出しすぎない
       });
 
-      noiseRef.current.chain(hp, Tone.Destination);
+      noiseRef.current.chain(lpN, Tone.Destination);
     }
+
   };
 
   const stopAll = () => {
@@ -193,9 +197,10 @@ export default function App() {
           // drumRef.current?.triggerAttackRelease("C2", "8n", t);
           drumRestRef.current?.triggerAttackRelease("C2", "16n", t);
         } else {
-          // 音符＝バンッ
-          bangNoteRef.current?.triggerAttackRelease("C1", "32n", t); // ← G1よりC1の方が“ドン/バン”寄り
-          noiseRef.current?.triggerAttackRelease("32n", t);
+          // 音符＝バァン
+          bangNoteRef.current?.triggerAttackRelease("C1", "16n", t);
+          noiseRef.current?.triggerAttackRelease("16n", t);
+
         }
 
         localTick += lenTicks;
