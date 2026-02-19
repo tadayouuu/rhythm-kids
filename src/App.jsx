@@ -1,27 +1,29 @@
 import { useState, useRef } from "react";
 import * as Tone from "tone";
 import "./App.css";
-import { QuarterNote, EighthPair, SixteenthPair, QuarterRest } from "./notes";
-
-// const CARDS = [
-//   // 音符（rest:false）＝ピッ音、休符（rest:true）＝打楽器（逆仕様）
-//   { id: "q", icon: "♩", pattern: [{ len: 1, rest: false }] }, // 四分
-//   { id: "e", icon: "♪", pattern: [{ len: 0.5, rest: false }] }, // 八分（単体）
-//   { id: "e2", icon: "♫", pattern: [{ len: 0.5, rest: false }, { len: 0.5, rest: false }] }, // 八分×2
-//   { id: "s2", icon: "♬", pattern: [{ len: 0.25, rest: false }, { len: 0.25, rest: false }] }, // 16分×2 ★ここ修正
-//   { id: "s", icon: "𝅘𝅥𝅯", pattern: [{ len: 0.25, rest: false }] }, // 16分
-//   { id: "h", icon: "𝅗𝅥", pattern: [{ len: 2, rest: false }] }, // 二分
-//   { id: "w", icon: "𝅝", pattern: [{ len: 4, rest: false }] }, // 全音符
-
-//   { id: "rq", icon: "𝄽", pattern: [{ len: 1, rest: true }] }, // 四分休符
-//   { id: "re", icon: "𝄾", pattern: [{ len: 0.5, rest: true }] }, // 八分休符
-// ];
+import {
+  QuarterNote,
+  EighthNote,
+  EighthPair,
+  SixteenthNote,
+  SixteenthPair,
+  HalfNote,
+  WholeNote,
+  QuarterRest,
+  EighthRest
+} from "./notes";
 
 const CARDS = [
+  { id: "w", icon: <WholeNote />, pattern: [{ len: 4, rest: false }] },
+  { id: "h", icon: <HalfNote />, pattern: [{ len: 2, rest: false }] },
   { id: "q", icon: <QuarterNote />, pattern: [{ len: 1, rest: false }] },
+  { id: "e", icon: <EighthNote />, pattern: [{ len: 0.5, rest: false }] },
   { id: "e2", icon: <EighthPair />, pattern: [{ len: 0.5, rest: false }, { len: 0.5, rest: false }] },
+  { id: "s", icon: <SixteenthNote />, pattern: [{ len: 0.25, rest: false }] },
   { id: "s2", icon: <SixteenthPair />, pattern: [{ len: 0.25, rest: false }, { len: 0.25, rest: false }] },
-  { id: "rq", icon: <QuarterRest />, pattern: [{ len: 1, rest: true }] }
+
+  { id: "rq", icon: <QuarterRest />, pattern: [{ len: 1, rest: true }] },
+  { id: "re", icon: <EighthRest />, pattern: [{ len: 0.5, rest: true }] },
 ];
 
 export default function App() {
