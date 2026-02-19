@@ -90,30 +90,33 @@ export default function App() {
     // 音符用（バンッ：太め＆短め）
     if (!bangNoteRef.current) {
       bangNoteRef.current = new Tone.MembraneSynth({
-        pitchDecay: 0.008,
-        octaves: 8,
+        pitchDecay: 0.006,      // 少し速く落とす（パンチ強化）
+        octaves: 10,            // 倍音増やして圧を足す
         oscillator: { type: "sine" },
-        envelope: { attack: 0.001, decay: 0.06, sustain: 0.0, release: 0.01 },
-        volume: 0,                 // ここ上げると“前に出る”
+        envelope: {
+          attack: 0.001,
+          decay: 0.09,          // 少し伸ばす（ドンの余韻）
+          sustain: 0.0,
+          release: 0.02
+        },
+        volume: 2               // ← ここ +2dB が効く
       });
 
-      // ちょい圧縮して“バンッ”感を安定させる
-      const comp = new Tone.Compressor(-18, 8);
+      const comp = new Tone.Compressor(-20, 10); // 少しだけ強く圧縮
       bangNoteRef.current.chain(comp, Tone.Destination);
     }
 
     // アタック（パッ）を混ぜるノイズ：高域だけ残して“打撃”に寄せる
     if (!noiseRef.current) {
-      const hp = new Tone.Filter(1800, "highpass");
+      const hp = new Tone.Filter(1500, "highpass"); // ちょい下げて存在感出す
       noiseRef.current = new Tone.NoiseSynth({
         noise: { type: "white" },
-        envelope: { attack: 0.001, decay: 0.02, sustain: 0.0 },
-        volume: -6
+        envelope: { attack: 0.001, decay: 0.025, sustain: 0.0 },
+        volume: -3    // ← -6 → -3 にするだけで“バン”が前に出る
       });
 
       noiseRef.current.chain(hp, Tone.Destination);
     }
-
   };
 
   const stopAll = () => {
